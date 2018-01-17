@@ -12,6 +12,7 @@ import utils
 from sys import argv
 
 border = 30
+overlap = 30
 
 if len(argv) != 3:
     print('Usage:', argv[0], 'input_file output_file')
@@ -88,7 +89,7 @@ def upscale_image(img_np):
     return y
 
 
-def split(img):
+def split(img, overlap):
     """
     Splits the image into four sections
     """
@@ -96,11 +97,28 @@ def split(img):
     x1 = w // 2
     y1 = h // 2
 
-    top_left = img[0:y1,0:x1,:]
-    top_right = img[0:y1,x1:w,:]
-    btm_left = img[y1:h,0:x1,:]
-    btm_right = img[y1:h,x1:w,:]
-    return top_left, top_right,btm_left,btm_right
+    top_left = img[0:y1 + overlap,0:x1 + overlap,:]
+    top_right = img[0:y1 + overlap,x1 - overlap:w,:]
+    btm_left = img[y1 - overlap:h,0:x1 + overlap,:]
+    btm_right = img[y1 - overlap:h,x1 - overlap:w,:]
+    return top_left, top_right, btm_left, btm_right
+
+
+def remove_overlap(split_image, overlap):
+    top_left, top_right, btm_left, btm_right = split_image
+    h,w,c = top_left.shape
+    top_left = top_left[0:h-overlap,0:w-overlap,:]
+
+    h,w,c = top_right.shape
+    top_right = top_right[0:h-overlap,overlap:w,:]
+
+    h,w,c = btm_left.shape
+    btm_left = btm_left[overlap:h,0:w-overlap,:]
+
+    h,w,c = btm_right.shape
+    btm_right = btm_right[overlap:h,overlap:w,:]
+
+    return top_left, top_right, btm_left, btm_right
 
 
 def check_and_upscale(img):
@@ -111,8 +129,9 @@ def check_and_upscale(img):
     h, w, c = img.shape
     if h > 600 or w > 600:
         print('Splitting the image! It is too big!')
-        split_image = split(img)
+        split_image = split(img, overlap)
         split_res = [check_and_upscale(x) for x in split_image]
+        split_res = remove_overlap(split_res, 2*overlap)
         res_image = np.empty((2*h,2*w,c),dtype=np.float32)
 
         y1,x1,c = split_res[0].shape
